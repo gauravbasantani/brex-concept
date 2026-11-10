@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Brex Concept · Gaurav Basantani</title>
+<meta name="description" content="How an expense agent could handle a receipt it can't fully read: what it says, what it asks, and how the person fixes or undoes it. An unofficial concept by Gaurav Basantani.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a working expense screen on the left (receipt + agent card), the reasoning behind it on the right; stacks on phones */
+:root{
+  --bg:#eef1f3; --surface:#ffffff; --ink:#15202b; --muted:#5a6672; --line:#d5dbe0;
+  --accent:#0d6e6a; --accent-ink:#ffffff; --accent-soft:#dcefed;
+  --warn:#8a5a00; --warn-soft:#fdf0d5; --bad:#9b2c2c; --bad-soft:#fbe3e3; --ok:#1f6b3a; --ok-soft:#ddf2e3;
+  --paper:#fbfbf8; --thermal:#3b3f44; --smudge:#b9bcbf;
+  --display:"Instrument Sans",system-ui,sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1519; --surface:#172027; --ink:#e6edf2; --muted:#a3b0ba; --line:#2c3943;
+  --accent:#5cc7bf; --accent-ink:#06201e; --accent-soft:#163633;
+  --warn:#f2c46b; --warn-soft:#3a2e12; --bad:#f19a9a; --bad-soft:#3b1d1d; --ok:#8fd9a8; --ok-soft:#163223;
+  --paper:#e9e9e4; --thermal:#2f3236; --smudge:#9da0a3; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1519; --surface:#172027; --ink:#e6edf2; --muted:#a3b0ba; --line:#2c3943;
+  --accent:#5cc7bf; --accent-ink:#06201e; --accent-soft:#163633;
+  --warn:#f2c46b; --warn-soft:#3a2e12; --bad:#f19a9a; --bad-soft:#3b1d1d; --ok:#8fd9a8; --ok-soft:#163223;
+  --paper:#e9e9e4; --thermal:#2f3236; --smudge:#9da0a3; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+.wrap{max-width:1120px;margin:0 auto;display:grid;gap:28px}
+header{display:grid;gap:8px;max-width:760px}
+.eyebrow{font:600 .75rem/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font:700 clamp(1.9rem,4vw,2.8rem)/1.08 var(--display);letter-spacing:-.02em;margin:0;text-wrap:balance}
+h2{font:600 1.15rem/1.3 var(--display);margin:0;text-wrap:balance}
+h3{font:600 .95rem/1.3 var(--display);margin:0}
+p{margin:0}
+.lede{color:var(--muted);max-width:65ch}
+.grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:24px;align-items:start}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.screen{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);font-size:.85rem;color:var(--muted);flex-wrap:wrap}
+.bar b{color:var(--ink);font-weight:600}
+.steps{display:flex;gap:6px;flex-wrap:wrap}
+.steps button{font:500 .78rem var(--body);border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:4px 10px;cursor:pointer}
+.steps button[aria-current="step"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.body{display:grid;grid-template-columns:200px minmax(0,1fr);gap:20px;padding:20px}
+@media(max-width:560px){.body{grid-template-columns:1fr}}
+/* receipt drawn as thermal paper */
+.receipt{background:var(--paper);color:var(--thermal);font:400 .74rem/1.45 var(--mono);padding:16px 14px 22px;border-radius:2px;box-shadow:0 1px 0 var(--line),0 6px 18px rgba(0,0,0,.08);position:relative;align-self:start;
+  -webkit-mask:linear-gradient(#000 0 0) top/100% calc(100% - 8px) no-repeat,radial-gradient(circle at 6px 0,transparent 5px,#000 5.5px) bottom/12px 8px repeat-x;
+          mask:linear-gradient(#000 0 0) top/100% calc(100% - 8px) no-repeat,radial-gradient(circle at 6px 0,transparent 5px,#000 5.5px) bottom/12px 8px repeat-x}
+.receipt .c{text-align:center}
+.receipt .row{display:flex;justify-content:space-between;gap:8px}
+.receipt hr{border:0;border-top:1px dashed var(--smudge);margin:8px 0}
+.smudge{color:var(--smudge);filter:blur(1.4px);display:inline-block}
+.receipt .hl{outline:2px solid var(--warn);outline-offset:2px;border-radius:2px}
+.agent{display:grid;gap:14px;min-width:0}
+.who{display:flex;gap:10px;align-items:center;font-size:.85rem;color:var(--muted)}
+.dot{width:26px;height:26px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font:600 .7rem var(--mono);flex:none}
+.fields{display:grid;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.f{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 12px;border-top:1px solid var(--line);font-size:.9rem}
+.f:first-child{border-top:0}
+.f .k{color:var(--muted);font-size:.8rem}
+.f .v{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.chip{font:500 .7rem/1 var(--body);padding:4px 8px;border-radius:999px;white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.ask{border:1px solid var(--warn);background:var(--warn-soft);border-radius:10px;padding:14px;display:grid;gap:10px}
+.ask.okbox{border-color:var(--ok);background:var(--ok-soft)}
+.ask.badbox{border-color:var(--bad);background:var(--bad-soft)}
+.ask p{color:var(--ink);font-size:.92rem}
+.why{font-size:.82rem;color:var(--muted)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font:600 .85rem var(--body);border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);min-height:38px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:focus-visible,.steps button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+textarea,input[type=text]{width:100%;font:inherit;font-size:.9rem;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);color:var(--ink)}
+.log{display:grid;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.log div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 12px;border-top:1px solid var(--line);font-size:.88rem}
+.log div:first-child{border-top:0}
+.undo{font:500 .8rem var(--body);background:none;border:0;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:4px}
+.side{display:grid;gap:16px}
+.note{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:8px}
+.note .n{font:500 .72rem var(--mono);color:var(--accent);letter-spacing:.06em}
+.note p{font-size:.92rem;color:var(--muted)}
+.note p strong{color:var(--ink);font-weight:600}
+.stat{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
+.stat span{font:500 .8rem var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.admin{font-size:.85rem;color:var(--muted);border-top:1px dashed var(--line);padding:14px 20px;display:grid;gap:4px}
+.admin b{color:var(--ink);font-weight:600}
+footer{color:var(--muted);font-size:.82rem;max-width:760px;display:grid;gap:4px}
+footer a{color:var(--accent)}
+@media(prefers-reduced-motion:no-preference){.agent>*{animation:in .25s ease-out both}@keyframes in{from{transform:translateY(4px)}to{transform:none}}}
+</style>
+<style>body{margin:0}</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Concept · Travel &amp; Expenses</div>
+    <h1>The receipt the agent can't fully read</h1>
+    <p class="lede">An employee uploads a crumpled dinner receipt from a London trip. The expense agent reads most of it, but the currency sign is smudged. This sketch shows what the agent says, what it asks, and how the person fixes it in a few taps. Click through the three steps, or try the other answers.</p>
+  </header>
+
+  <div class="grid">
+    <section class="screen" aria-label="Expense screen concept">
+      <div class="bar">
+        <span><b>Dinner with client</b> · London trip, Nov 4</span>
+        <nav class="steps" aria-label="Steps">
+          <button type="button" data-go="1" id="s1">1 · Read</button>
+          <button type="button" data-go="2" id="s2">2 · Policy</button>
+          <button type="button" data-go="3" id="s3">3 · Done</button>
+        </nav>
+      </div>
+      <div class="body">
+        <div class="receipt" aria-label="Receipt photo, drawn">
+          <div class="c"><b>KETTLE &amp; RYE</b><br>14 Pancras Sq, London<br>04/11/2026 20:41</div>
+          <hr>
+          <div class="row"><span>2 x Set menu</span><span>58.00</span></div>
+          <div class="row"><span>1 x Sparkling water</span><span>4.50</span></div>
+          <div class="row"><span>2 x Coffee</span><span>7.00</span></div>
+          <div class="row"><span>Service 12.5%</span><span>8.69</span></div>
+          <div class="row"><span>VAT incl.</span><span>13.03</span></div>
+          <hr>
+          <div class="row" id="totalrow"><b>TOTAL</b><b><span class="smudge">£</span>78.19</b></div>
+          <hr>
+          <div class="c">VISA ****4417<br>Thank you</div>
+        </div>
+        <div class="agent" id="agent" aria-live="polite"></div>
+      </div>
+      <div class="admin" id="admin"></div>
+    </section>
+
+    <aside class="side" aria-label="Why it works this way">
+      <div class="note">
+        <div class="n">WHERE THIS COMES FROM</div>
+        <h3>I built the small version of this problem</h3>
+        <p>Gauravide is a receipt to Splitwise app I designed and launched, directing Claude Code to write the code. When the reader isn't sure, it says so and hands the person the lines to check.</p>
+        <div class="stat"><span>67 scans</span><span>28 read on their own</span><span>39 checked line by line</span><span>0 unreadable</span></div>
+      </div>
+      <div class="note">
+        <div class="n">1 · SHOW HOW SURE IT IS</div>
+        <p><strong>Every field says how the agent got it.</strong> Read from the photo, matched to the card charge, or a guess. Only the guesses need the person's attention, so only the guesses ask for it.</p>
+      </div>
+      <div class="note">
+        <div class="n">2 · THE QUIET MISTAKES ARE THE BAD ONES</div>
+        <p><strong>In Gauravide a £20 receipt once reached Splitwise as $20, with no error shown.</strong> A wrong currency looks just like a right one. So the agent checks it against something real, the card charge, and asks when the two don't line up.</p>
+      </div>
+      <div class="note">
+        <div class="n">3 · EVERY STEP CAN BE UNDONE</div>
+        <p><strong>The agent lists what it did, and each line has its own undo.</strong> Finance sees the same list, so nobody has to guess why an expense passed or got flagged.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    <p>A concept by Gaurav Basantani for the Senior Product Designer, Travel &amp; Expenses role. Not made with or for Brex, and no Brex data or brand is used. The receipt, merchant and numbers are made up; the exchange rate is a round example.</p>
+    <p><a href="https://gauravbasantani.com">gauravbasantani.com</a> · <a href="https://gauravide.vercel.app">gauravide.vercel.app</a></p>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var RATE=1.26, GBP=78.19, USD=(GBP*RATE).toFixed(2), LIMIT=60;
+  var st={step:1,currency:null,people:null,reason:"",undone:{}};
+  var agent=document.getElementById("agent"), admin=document.getElementById("admin"), hl=document.getElementById("totalrow");
+  function money(c){return c==="USD"?"$"+GBP.toFixed(2):"£"+GBP.toFixed(2)}
+  function field(k,v,chip,cls){return '<div class="f"><span class="k">'+k+'</span><span class="v">'+v+'</span><span class="chip '+cls+'">'+chip+'</span></div>'}
+  function who(t){return '<div class="who"><span class="dot">AI</span><span>'+t+'</span></div>'}
+  function perHead(){return GBP/(st.people||1)}
+  function render(){
+    ["s1","s2","s3"].forEach(function(id,i){var b=document.getElementById(id); if(i+1===st.step)b.setAttribute("aria-current","step");else b.removeAttribute("aria-current")});
+    hl.classList.toggle("hl",st.step===1&&!st.currency);
+    var h="";
+    if(st.step===1){
+      h+=who("I read this receipt. One thing needs you.");
+      h+='<div class="fields">'+
+        field("Merchant","Kettle &amp; Rye, London","read from photo","ok")+
+        field("Date","Nov 4, 2026","read from photo","ok")+
+        field("Card","Visa ending 4417","matches your card","ok")+
+        field("Total",st.currency?money(st.currency)+(st.currency==="GBP"?" ($"+USD+" charged)":""):"78.19, currency unclear",st.currency?"you confirmed":"needs you",st.currency?"ok":"warn")+
+        field("Category","Meals, client","from your trip","ok")+'</div>';
+      if(!st.currency){
+        h+='<div class="ask"><p><b>Is this £78.19 or $78.19?</b> The currency sign is smudged. Your card was charged <b>$'+USD+'</b> the same night, which matches £78.19 at about '+RATE+' dollars to the pound.</p>'+
+           '<p class="why">I won\'t guess this one. A wrong currency looks just like a right one.</p>'+
+           '<div class="btns"><button type="button" class="btn primary" data-cur="GBP">Yes, £78.19</button><button type="button" class="btn" data-cur="USD">No, it was $78.19</button></div></div>';
+      }else if(st.currency==="USD"){
+        h+='<div class="ask badbox"><p><b>Then the card charge doesn\'t match.</b> You were charged $'+USD+', not $78.19. That can mean a tip added after the receipt printed, or the wrong receipt.</p>'+
+           '<div class="btns"><button type="button" class="btn primary" data-cur="GBP">Go back, it was £</button><button type="button" class="btn" data-go="2">Keep $78.19 and flag for finance</button></div></div>';
+      }else{
+        h+='<div class="ask okbox"><p><b>Got it, £78.19.</b> I\'ll record $'+USD+', the amount your card was charged.</p><div class="btns"><button type="button" class="btn primary" data-go="2">Next: check policy</button></div></div>';
+      }
+    }
+    if(st.step===2){
+      h+=who("Checking this against your company's meal policy.");
+      h+='<div class="fields">'+field("Rule","Meals abroad: up to £"+LIMIT+" per person","from your policy","ok")+
+        field("Total",st.currency==="USD"?"$78.19 (flagged)":"£78.19","checked","ok")+
+        field("People",st.people?(st.people===1?"Just you":st.people+" people"):"not on receipt",st.people?"you said":"needs you",st.people?"ok":"warn")+'</div>';
+      if(!st.people){
+        h+='<div class="ask"><p><b>How many people was this for?</b> The receipt shows two set menus, so I think two. Per person that\'s £'+(GBP/2).toFixed(2)+', inside the £'+LIMIT+' limit.</p>'+
+           '<div class="btns"><button type="button" class="btn primary" data-ppl="2">2 people</button><button type="button" class="btn" data-ppl="1">Just me</button></div></div>';
+      }else if(perHead()>LIMIT){
+        h+='<div class="ask badbox"><p><b>£'+perHead().toFixed(2)+' is over the £'+LIMIT+' limit</b> by £'+(perHead()-LIMIT).toFixed(2)+'. You can still submit it. Add a short reason so your approver isn\'t left guessing.</p>'+
+           '<label for="reason" class="why">Reason for your approver</label><textarea id="reason" rows="2" placeholder="Late arrival, only place open near the hotel">'+st.reason+'</textarea>'+
+           '<div class="btns"><button type="button" class="btn primary" data-go="3">Submit with reason</button><button type="button" class="btn" data-ppl="2">Actually, 2 people</button></div></div>';
+      }else{
+        h+='<div class="ask okbox"><p><b>Inside policy.</b> £'+perHead().toFixed(2)+' per person for 2 people. Add your guest\'s name now or later.</p>'+
+           '<label for="guest" class="why">Guest (optional)</label><input id="guest" type="text" placeholder="Name, company">'+
+           '<div class="btns"><button type="button" class="btn primary" data-go="3">Submit</button></div></div>';
+      }
+    }
+    if(st.step===3){
+      h+=who("Submitted. Here's everything I did, so you can undo any of it.");
+      var rows=[
+        ["cur","Read the total as "+(st.currency==="USD"?"$78.19 (you chose this; flagged because the card charge was $"+USD+")":"£78.19 and recorded $"+USD+" from your card")],
+        ["cat","Filed it under Meals, client, from your London trip"],
+        ["ppl","Split it across "+(st.people||1)+(st.people===1?" person":" people")+" for the policy check"],
+        ["pol",perHead()>LIMIT?"Flagged it over policy with your reason":"Marked it inside the meal policy"]
+      ];
+      h+='<div class="log">'+rows.map(function(r){
+        var u=st.undone[r[0]];
+        return '<div><span'+(u?' style="text-decoration:line-through;color:var(--muted)"':'')+'>'+r[1]+'</span>'+(u?'<span class="chip warn">Undone. Fix it in step '+(r[0]==="cur"||r[0]==="cat"?1:2)+'</span>':'<button type="button" class="undo" data-undo="'+r[0]+'">Undo</button>')+'</div>';
+      }).join("")+'</div>';
+      h+='<div class="btns"><button type="button" class="btn" data-reset="1">Start over</button></div>';
+    }
+    agent.innerHTML=h;
+    var parts=["The agent checked the total against the card charge."];
+    parts.push(st.currency?"The employee confirmed the currency.":"It's waiting for the employee to confirm the currency.");
+    if(st.people)parts.push(st.people===1?"The employee said it was just them.":"The employee said it was for "+st.people+" people.");
+    if(st.step===3&&perHead()>LIMIT)parts.push("It's over the meal limit, with the employee's reason.");
+    admin.innerHTML='<span><b>What finance sees:</b> '+parts.join(" ")+'</span><span>It’s the same list the employee sees, so nobody has to guess why an expense passed or got flagged.</span>';
+    var r=document.getElementById("reason"); if(r)r.addEventListener("input",function(){st.reason=r.value});
+  }
+  document.addEventListener("click",function(e){
+    var t=e.target.closest("button"); if(!t)return;
+    if(t.dataset.cur){st.currency=t.dataset.cur; if(st.step!==1)st.step=1;}
+    if(t.dataset.ppl){st.people=+t.dataset.ppl; st.step=2;}
+    if(t.dataset.go){var g=+t.dataset.go; if(g>=2&&!st.currency)st.currency="GBP"; if(g===3&&!st.people)st.people=2; st.step=g;}
+    if(t.dataset.undo){st.undone[t.dataset.undo]=true;}
+    if(t.dataset.reset){st={step:1,currency:null,people:null,reason:"",undone:{}};}
+    render();
+  });
+  render();
+})();
+</script>
+
+</body>
+</html>
