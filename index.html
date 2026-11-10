@@ -153,7 +153,7 @@ footer a{color:var(--accent)}
       </div>
       <div class="note">
         <div class="n">3 · EVERY STEP CAN BE UNDONE</div>
-        <p><strong>The agent lists what it did, and each line has its own undo.</strong> Finance sees the same list, so nobody has to guess why an expense passed or got flagged.</p>
+        <p><strong>The agent lists what it did, and you can undo any answer.</strong> Undo takes you back to that question. Finance sees the same list, so nobody has to guess why an expense passed or got flagged.</p>
       </div>
     </aside>
   </div>
@@ -167,12 +167,14 @@ footer a{color:var(--accent)}
 <script>
 (function(){
   var RATE=1.26, GBP=78.19, USD=(GBP*RATE).toFixed(2), LIMIT=60;
-  var st={step:1,currency:null,people:null,reason:"",undone:{}};
+  function fresh(){return {step:1,currency:null,people:null,reason:"",cat:"Meals, client"}}
+  var st=fresh();
   var agent=document.getElementById("agent"), admin=document.getElementById("admin"), hl=document.getElementById("totalrow");
   function money(c){return c==="USD"?"$"+GBP.toFixed(2):"£"+GBP.toFixed(2)}
   function field(k,v,chip,cls){return '<div class="f"><span class="k">'+k+'</span><span class="v">'+v+'</span><span class="chip '+cls+'">'+chip+'</span></div>'}
   function who(t){return '<div class="who"><span class="dot">AI</span><span>'+t+'</span></div>'}
-  function perHead(){return GBP/(st.people||1)}
+  function amt(){return st.currency==="USD"?GBP/RATE:GBP}
+  function perHead(){return amt()/(st.people||1)}
   function render(){
     ["s1","s2","s3"].forEach(function(id,i){var b=document.getElementById(id); if(i+1===st.step)b.setAttribute("aria-current","step");else b.removeAttribute("aria-current")});
     hl.classList.toggle("hl",st.step===1&&!st.currency);
@@ -183,8 +185,8 @@ footer a{color:var(--accent)}
         field("Merchant","Kettle &amp; Rye, London","read from photo","ok")+
         field("Date","Nov 4, 2026","read from photo","ok")+
         field("Card","Visa ending 4417","matches your card","ok")+
-        field("Total",st.currency?money(st.currency)+(st.currency==="GBP"?" ($"+USD+" charged)":""):"78.19, currency unclear",st.currency?"you confirmed":"needs you",st.currency?"ok":"warn")+
-        field("Category","Meals, client","from your trip","ok")+'</div>';
+        field("Total",st.currency?money(st.currency)+(st.currency==="GBP"?" ($"+USD+" charged)":""):"78.19, currency unclear",st.currency==="USD"?"doesn't match card":st.currency?"you confirmed":"needs you",st.currency==="USD"?"bad":st.currency?"ok":"warn")+
+        field("Category",st.cat||"Not set",st.cat?"from your trip":"needs you",st.cat?"ok":"warn")+'</div>';
       if(!st.currency){
         h+='<div class="ask"><p><b>Is this £78.19 or $78.19?</b> The currency sign is smudged. Your card was charged <b>$'+USD+'</b> the same night, which matches £78.19 at about '+RATE+' dollars to the pound.</p>'+
            '<p class="why">I won\'t guess this one. A wrong currency looks just like a right one.</p>'+
@@ -199,10 +201,10 @@ footer a{color:var(--accent)}
     if(st.step===2){
       h+=who("Checking this against your company's meal policy.");
       h+='<div class="fields">'+field("Rule","Meals abroad: up to £"+LIMIT+" per person","from your policy","ok")+
-        field("Total",st.currency==="USD"?"$78.19 (flagged)":"£78.19","checked","ok")+
+        field("Total",st.currency==="USD"?"$78.19, about £"+amt().toFixed(2)+" (flagged)":"£78.19",st.currency==="USD"?"doesn't match card":"checked",st.currency==="USD"?"bad":"ok")+
         field("People",st.people?(st.people===1?"Just you":st.people+" people"):"not on receipt",st.people?"you said":"needs you",st.people?"ok":"warn")+'</div>';
       if(!st.people){
-        h+='<div class="ask"><p><b>How many people was this for?</b> The receipt shows two set menus, so I think two. Per person that\'s £'+(GBP/2).toFixed(2)+', inside the £'+LIMIT+' limit.</p>'+
+        h+='<div class="ask"><p><b>How many people was this for?</b> The receipt shows two set menus, so I think two. Per person that\'s £'+(amt()/2).toFixed(2)+', inside the £'+LIMIT+' limit.</p>'+
            '<div class="btns"><button type="button" class="btn primary" data-ppl="2">2 people</button><button type="button" class="btn" data-ppl="1">Just me</button></div></div>';
       }else if(perHead()>LIMIT){
         h+='<div class="ask badbox"><p><b>£'+perHead().toFixed(2)+' is over the £'+LIMIT+' limit</b> by £'+(perHead()-LIMIT).toFixed(2)+'. You can still submit it. Add a short reason so your approver isn\'t left guessing.</p>'+
@@ -216,21 +218,24 @@ footer a{color:var(--accent)}
     }
     if(st.step===3){
       h+=who("Submitted. Here's everything I did, so you can undo any of it.");
+      var over=perHead()>LIMIT;
       var rows=[
-        ["cur","Read the total as "+(st.currency==="USD"?"$78.19 (you chose this; flagged because the card charge was $"+USD+")":"£78.19 and recorded $"+USD+" from your card")],
-        ["cat","Filed it under Meals, client, from your London trip"],
+        ["cur","Read the total as "+(st.currency==="USD"?"$78.19, as you said. Flagged, because your card was charged $"+USD:"£78.19 and recorded $"+USD+" from your card")],
+        ["cat",st.cat?"Filed it under "+st.cat+", from your London trip":""],
         ["ppl","Split it across "+(st.people||1)+(st.people===1?" person":" people")+" for the policy check"],
-        ["pol",perHead()>LIMIT?"Flagged it over policy with your reason":"Marked it inside the meal policy"]
+        ["pol",over?"Flagged it over the meal limit, with your reason":"Marked it inside the meal policy"]
       ];
       h+='<div class="log">'+rows.map(function(r){
-        var u=st.undone[r[0]];
-        return '<div><span'+(u?' style="text-decoration:line-through;color:var(--muted)"':'')+'>'+r[1]+'</span>'+(u?'<span class="chip warn">Undone. Fix it in step '+(r[0]==="cur"||r[0]==="cat"?1:2)+'</span>':'<button type="button" class="undo" data-undo="'+r[0]+'">Undo</button>')+'</div>';
+        if(r[0]==="cat"&&!st.cat)return '<div style="grid-template-columns:1fr"><span><b>Category cleared.</b> Pick the right one:</span><span class="btns"><button type="button" class="btn" data-cat="Meals, client">Meals, client</button><button type="button" class="btn" data-cat="Meals, team">Meals, team</button><button type="button" class="btn" data-cat="Travel">Travel</button></span></div>';
+        if(r[0]==="pol")return '<div><span>'+r[1]+'</span><span class="chip '+(over?"bad":"ok")+'">follows from the lines above</span></div>';
+        return '<div><span>'+r[1]+'</span><button type="button" class="undo" data-undo="'+r[0]+'">Undo</button></div>';
       }).join("")+'</div>';
+      h+='<p class="why">Undo takes you back to that question, so the answer and everything after it get redone.</p>';
       h+='<div class="btns"><button type="button" class="btn" data-reset="1">Start over</button></div>';
     }
     agent.innerHTML=h;
     var parts=["The agent checked the total against the card charge."];
-    parts.push(st.currency?"The employee confirmed the currency.":"It's waiting for the employee to confirm the currency.");
+    parts.push(st.currency==="USD"?"The employee says $78.19, but the card was charged $"+USD+", so it's flagged.":st.currency?"The employee confirmed the currency.":"It's waiting for the employee to confirm the currency.");
     if(st.people)parts.push(st.people===1?"The employee said it was just them.":"The employee said it was for "+st.people+" people.");
     if(st.step===3&&perHead()>LIMIT)parts.push("It's over the meal limit, with the employee's reason.");
     admin.innerHTML='<span><b>What finance sees:</b> '+parts.join(" ")+'</span><span>It’s the same list the employee sees, so nobody has to guess why an expense passed or got flagged.</span>';
@@ -241,8 +246,11 @@ footer a{color:var(--accent)}
     if(t.dataset.cur){st.currency=t.dataset.cur; if(st.step!==1)st.step=1;}
     if(t.dataset.ppl){st.people=+t.dataset.ppl; st.step=2;}
     if(t.dataset.go){var g=+t.dataset.go; if(g>=2&&!st.currency)st.currency="GBP"; if(g===3&&!st.people)st.people=2; st.step=g;}
-    if(t.dataset.undo){st.undone[t.dataset.undo]=true;}
-    if(t.dataset.reset){st={step:1,currency:null,people:null,reason:"",undone:{}};}
+    if(t.dataset.undo==="cur"){st.currency=null;st.step=1}
+    if(t.dataset.undo==="ppl"){st.people=null;st.step=2}
+    if(t.dataset.undo==="cat"){st.cat=null}
+    if(t.dataset.cat){st.cat=t.dataset.cat}
+    if(t.dataset.reset){st=fresh();}
     render();
   });
   render();
